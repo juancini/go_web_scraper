@@ -1,13 +1,15 @@
 package main
 
 import (
-	"encoding/csv"
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
 
 	// Colly is an open source WEB scrapping library
 	"github.com/gocolly/colly"
+	// SQLite drivers for database
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type PokemonProduct struct {
@@ -15,12 +17,33 @@ type PokemonProduct struct {
 }
 
 func main() {
-	// initializing the slice of structs that will contain the scraped data
-	var pokemonProducts []PokemonProduct
-
 	// input args
 	args := os.Args
 	url := args[1]
+
+	// initializing sql database that will save the scraped data
+	db, err := sql.Open("sqlite3", "scraping.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// Create a table to store the scraped data
+	_, err = db.Exec(`
+        CREATE TABLE IF NOT EXISTS scraped_data (
+            url TEXT,
+			image TEXT,
+			name TEXT,
+			price TEXT
+        )
+    `)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// initializing the slice of structs that will contain the scraped data
+	var pokemonProducts []PokemonProduct
+
 	// new colly collector
 	c := colly.NewCollector()
 
@@ -50,41 +73,20 @@ func main() {
 	c.OnError(func(r *colly.Response, e error) {
 		fmt.Println("Blimey, an error occurred!:", e)
 	})
+
+	// go to site of URL
 	c.Visit(url)
 
-	// opening the CSV file
-	file, err := os.Create("products.csv")
-	if err != nil {
-		log.Fatalln("Failed to create output CSV file", err)
-	}
-	defer file.Close()
-
-	// initializing a file writer
-	writer := csv.NewWriter(file)
-
-	// writing the CSV headers
-	headers := []string{
-		"url",
-		"image",
-		"name",
-		"price",
-	}
-	writer.Write(headers)
-
-	// writing each Pokemon product as a CSV row
+	// writing each Pokemon to Database
 	for _, pokemonProduct := range pokemonProducts {
-		// converting a PokemonProduct to an array of strings
-		record := []string{
-			pokemonProduct.url,
-			pokemonProduct.image,
-			pokemonProduct.name,
-			pokemonProduct.price,
+		fmt.Println("Saving data...")
+		// Insert the scraped data into the database
+		_, err = db.Exec("INSERT INTO scraped_data (url, image, name, price) VALUES (?, ?, ?, ?)", pokemonProduct.url, pokemonProduct.image,
+			pokemonProduct.name, pokemonProduct.price)
+		if err != nil {
+			log.Fatal(err)
 		}
-
-		// adding a CSV record to the output file
-		writer.Write(record)
 	}
-	defer writer.Flush()
 
 	fmt.Println("Finish!")
 }
