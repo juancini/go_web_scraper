@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"os"
 
 	// Colly is an open source WEB scrapping library
 	"github.com/gocolly/colly"
@@ -10,32 +10,23 @@ import (
 
 func main() {
 	// scrapping logic
+	args := os.Args
+	url := args[1]
 	c := colly.NewCollector()
 	c.Visit("https://scrapeme.live/shop/")
 
+	// whenever the collector is about to make a new request
 	c.OnRequest(func(r *colly.Request) {
-		fmt.Println("Visiting: ", r.URL)
+		// print the url of that request
+		fmt.Println("Visiting", r.URL)
 	})
-
-	c.OnError(func(_ *colly.Response, err error) {
-		log.Println("Something went wrong: ", err)
-	})
-
 	c.OnResponse(func(r *colly.Response) {
-		fmt.Println("Page visited: ", r.Request.URL)
+		fmt.Println("Got a response from", r.Request.URL)
 	})
-
-	c.OnHTML("a", func(e *colly.HTMLElement) {
-		// printing all URLs associated with the a links in the page
-		fmt.Println("%v", e.Attr("href"))
+	c.OnError(func(r *colly.Response, e error) {
+		fmt.Println("Blimey, an error occurred!:", e)
 	})
+	c.Visit(url)
 
-	c.OnScraped(func(r *colly.Response) {
-		fmt.Println(r.Request.URL, " scraped!")
-	})
-
-	// downloading the target HTML page
-	c.Visit("https://scrapeme.live/shop/")
-
-	fmt.Println("Hello World!")
+	fmt.Println("Finish!")
 }
